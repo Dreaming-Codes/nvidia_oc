@@ -1,55 +1,77 @@
-name: Publish Cargo Release
+name: Release Workflow
 
 on:
   push:
-    paths:
-      - "Cargo.toml"
+    branches:
+      - main
+  workflow_dispatch:
 
 jobs:
-  publish:
-    name: Publish New Release
+  release:
     runs-on: ubuntu-latest
-
     steps:
-    - name: Checkout repository
-      uses: actions/checkout@v3
+    - name: Checkout code
+      uses: actions/checkout@v2
 
-    - name: Install Rust
+    - name: Set up Rust
       uses: actions-rs/toolchain@v1
       with:
         toolchain: stable
         override: true
 
-    - name: Get version from Cargo.toml
-      id: cargo
+    - name: Get the version from Cargo.toml
+      id: cargo-version
       run: |
-        version=$(grep -m1 '^version =' Cargo.toml | sed 's/version = "\(.*\)"/\1/')
-        echo "::set-output name=version::$version"
+        VERSION=$(grep '^version' Cargo.toml | sed -E 's/version = "(.*)"/\1/')
+        echo "VERSION=$VERSION" >> $GITHUB_ENV
 
-    - name: Check if version has changed
-      id: version_check
+    - name: Get the latest tag
+      id: latest-tag
       run: |
-        git fetch --tags
-        latest_tag=$(git describe --tags `git rev-list --tags --max-count=1`)
-        if [ "$latest_tag" == "v${{ steps.cargo.outputs.version }}" ]; then
-          echo "Version has not changed. Exiting."
-          exit 0
+        TAG=$(git describe --tags --abbrev=0 || echo "0.0.0")
+        echo "TAG=$TAG" >> $GITHUB_ENV
+
+    - name: Compare versions
+      id: compare-versions
+      run: |
+        should_release=false
+        if [ "$(printf '%s\n' "$TAG" "$VERSION" | sort -V | head -n1)" != "$VERSION" ]; then
+          should_release=true
         fi
-        echo "Version has changed. Continuing."
-
-    - name: Publish to crates.io
+        echo "should_release=$should_release" >> $GITHUB_ENV
       env:
-        CARGO_REGISTRY_TOKEN: ${{ secrets.CARGO_REGISTRY_TOKEN }}
+        TAG: ${{ env.TAG }}
+        VERSION: ${{ env.VERSION }}
+
+    - name: Build the crate
+      if: env.should_release == 'true'
+      run: cargo build --release
+
+    - name: Create a new tag
+      if: env.should_release == 'true'
       run: |
-        cargo publish --token $CARGO_REGISTRY_TOKEN
+        git tag ${{ env.VERSION }}
+        git push origin ${{ env.VERSION }}
+
+    - name: Generate release notes
+      id: generate-notes
+      if: env.should_release == 'true'
+      run: |
+        NOTES=$(git log --pretty=format:"%h - %s" ${{ env.TAG }}..HEAD)
+        echo "NOTES=$NOTES" >> $GITHUB_ENV
 
     - name: Create GitHub Release
-      uses: softprops/action-gh-release@v1
-      if: steps.version_check.outputs.changed == 'true'
-      with:
-        name: v${{ steps.cargo.outputs.version }}
-        tag_name: v${{ steps.cargo.outputs.version }}
-        files: |
-          target/package/*
+      if: env.should_release == 'true'
+      uses: actions/create-release@v1
       env:
         GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+      with:
+        tag_name: ${{ env.VERSION }}
+        release_name: ${{ env.VERSION }}
+        body: |
+          Changes since last release:
+          ${{ env.NOTES }}
+
+    - name: Publish to crates.io
+      if: env.should_release == 'true'
+      run: cargo publish --token ${{ secrets.CARGO_REGISTRY_TOKEN }}
