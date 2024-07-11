@@ -1,6 +1,7 @@
 name: Release Workflow
 
 permissions:
+  id-token: write
   contents: write
   actions: write
   attestations: write
