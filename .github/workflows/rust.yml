@@ -59,14 +59,6 @@ jobs:
         git tag ${{ env.VERSION }}
         git push origin ${{ env.VERSION }}
 
-    - name: Generate release notes
-      id: generate-notes
-      if: env.should_release == 'true'
-      run: |
-        echo "NOTES<<EOF" >> $GITHUB_ENV
-        git log --pretty=format:"%h - %s" ${{ env.TAG }}..HEAD >> $GITHUB_ENV
-        echo "EOF" >> $GITHUB_ENV
-
     - name: Create GitHub Release
       if: env.should_release == 'true'
       uses: actions/create-release@v1
@@ -75,9 +67,6 @@ jobs:
       with:
         tag_name: ${{ env.VERSION }}
         release_name: ${{ env.VERSION }}
-        body: |
-          Changes since last release:
-          ${{ env.NOTES }}
 
     - name: Publish to crates.io
       if: env.should_release == 'true'
