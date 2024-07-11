@@ -3,6 +3,7 @@ name: Release Workflow
 permissions:
   contents: write
   actions: write
+  attestations: write
 
 on:
   push:
@@ -53,6 +54,17 @@ jobs:
       if: env.should_release == 'true'
       run: cargo build --release
 
+    - uses: actions/attest-build-provenance@v1
+      with:
+        subject-path: 'target/release/nvidia_oc'
+
+    - name: Upload Release Artifact
+      if: env.should_release == 'true'
+      uses: actions/upload-artifact@v4
+      with:
+        name: release-artifact
+        path: target/release/nvidia_oc
+
     - name: Create a new tag
       if: env.should_release == 'true'
       run: |
@@ -67,6 +79,7 @@ jobs:
       with:
         tag_name: ${{ env.VERSION }}
         release_name: ${{ env.VERSION }}
+        artifacts: release-artifact
 
     - name: Publish to crates.io
       if: env.should_release == 'true'
