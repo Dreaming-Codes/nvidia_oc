@@ -40,8 +40,6 @@ enum Commands {
 }
 
 fn main() {
-    sudo::escalate_if_needed().expect("Failed to escalate privileges");
-
     let cli = Cli::parse();
 
     match &cli.command {
@@ -55,6 +53,8 @@ fn main() {
                 eprintln!("Error: At least one of --freq-offset, --mem-offset, or --power-limit must be provided.");
                 std::process::exit(1);
             }
+
+            sudo::escalate_if_needed().expect("Failed to escalate privileges");
 
             let nvml = Nvml::init().expect("Failed to initialize NVML");
 
