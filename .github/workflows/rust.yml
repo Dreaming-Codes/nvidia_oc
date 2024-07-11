@@ -63,8 +63,9 @@ jobs:
       id: generate-notes
       if: env.should_release == 'true'
       run: |
-        NOTES=$(git log --pretty=format:"%h - %s" ${{ env.TAG }}..HEAD)
-        echo "NOTES=$NOTES" >> $GITHUB_ENV
+        echo "NOTES<<EOF" >> $GITHUB_ENV
+        git log --pretty=format:"%h - %s" ${{ env.TAG }}..HEAD >> $GITHUB_ENV
+        echo "EOF" >> $GITHUB_ENV
 
     - name: Create GitHub Release
       if: env.should_release == 'true'
