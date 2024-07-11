@@ -3,7 +3,9 @@ name: Release Workflow
 on:
   push:
     branches:
-      - main
+      - master
+    paths:
+      - "Cargo.toml"
   workflow_dispatch:
 
 jobs:
