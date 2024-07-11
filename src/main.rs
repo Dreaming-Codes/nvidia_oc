@@ -1,4 +1,4 @@
-use clap::{arg, CommandFactory, Parser, Subcommand};
+use clap::{arg, Args, CommandFactory, Parser, Subcommand};
 use clap_complete::{generate, Generator, Shell};
 use nvml_wrapper::Nvml;
 use nvml_wrapper_sys::bindings::{nvmlDevice_t, NvmlLib};
@@ -19,17 +19,8 @@ enum Commands {
         #[arg(short, long)]
         index: u32,
 
-        /// GPU frequency offset
-        #[arg(short, long, group = "parameter")]
-        freq_offset: Option<i32>,
-
-        /// GPU memory frequency offset
-        #[arg(short, long, group = "parameter")]
-        mem_offset: Option<i32>,
-
-        /// GPU power limit in milliwatts
-        #[arg(short, long, group = "parameter")]
-        power_limit: Option<u32>,
+        #[command(flatten)]
+        sets: Sets,
     },
     /// Generate shell completion script
     Completion {
@@ -39,21 +30,33 @@ enum Commands {
     },
 }
 
+#[derive(Args, Debug)]
+#[group(required = true, multiple = true)]
+struct Sets {
+    /// GPU frequency offset
+    #[arg(short, long)]
+    freq_offset: Option<i32>,
+    /// GPU memory frequency offset
+    #[arg(short, long)]
+    mem_offset: Option<i32>,
+    /// GPU power limit in milliwatts
+    #[arg(short, long)]
+    power_limit: Option<u32>,
+}
+
 fn main() {
     let cli = Cli::parse();
 
     match &cli.command {
         Commands::Set {
             index,
-            freq_offset,
-            mem_offset,
-            power_limit,
+            sets:
+                Sets {
+                    freq_offset,
+                    mem_offset,
+                    power_limit,
+                },
         } => {
-            if freq_offset.is_none() && mem_offset.is_none() && power_limit.is_none() {
-                eprintln!("Error: At least one of --freq-offset, --mem-offset, or --power-limit must be provided.");
-                std::process::exit(1);
-            }
-
             sudo::escalate_if_needed().expect("Failed to escalate privileges");
 
             let nvml = Nvml::init().expect("Failed to initialize NVML");
