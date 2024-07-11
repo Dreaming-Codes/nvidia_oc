@@ -1,0 +1,55 @@
+name: Publish Cargo Release
+
+on:
+  push:
+    paths:
+      - "Cargo.toml"
+
+jobs:
+  publish:
+    name: Publish New Release
+    runs-on: ubuntu-latest
+
+    steps:
+    - name: Checkout repository
+      uses: actions/checkout@v3
+
+    - name: Install Rust
+      uses: actions-rs/toolchain@v1
+      with:
+        toolchain: stable
+        override: true
+
+    - name: Get version from Cargo.toml
+      id: cargo
+      run: |
+        version=$(grep -m1 '^version =' Cargo.toml | sed 's/version = "\(.*\)"/\1/')
+        echo "::set-output name=version::$version"
+
+    - name: Check if version has changed
+      id: version_check
+      run: |
+        git fetch --tags
+        latest_tag=$(git describe --tags `git rev-list --tags --max-count=1`)
+        if [ "$latest_tag" == "v${{ steps.cargo.outputs.version }}" ]; then
+          echo "Version has not changed. Exiting."
+          exit 0
+        fi
+        echo "Version has changed. Continuing."
+
+    - name: Publish to crates.io
+      env:
+        CARGO_REGISTRY_TOKEN: ${{ secrets.CARGO_REGISTRY_TOKEN }}
+      run: |
+        cargo publish --token $CARGO_REGISTRY_TOKEN
+
+    - name: Create GitHub Release
+      uses: softprops/action-gh-release@v1
+      if: steps.version_check.outputs.changed == 'true'
+      with:
+        name: v${{ steps.cargo.outputs.version }}
+        tag_name: v${{ steps.cargo.outputs.version }}
+        files: |
+          target/package/*
+      env:
+        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
