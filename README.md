@@ -10,7 +10,7 @@ Use something like `cron` to run this tool at startup with the desired overclock
 
 ## Run on startup
 1. create `/etc/systemd/system/nvidia_oc.service` with the following content
-```toml
+```service
 [Unit]
 Description=NVIDIA Overclocking Service
 After=network.target
