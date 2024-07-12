@@ -25,4 +25,4 @@ WantedBy=multi-user.target
 ```
 To do this you can run `sudo nano /etc/systemd/system/nvidia_oc.service` and paste the content above, then hit ctrl + x, Y and enter to confirm, enter again to confirm the path, done
 2. Reload systemctl service by running `sudo systemctl daemon-reload`
-3. Run `systemctl enable --now nvidia_oc`
+3. Run `sudo systemctl enable --now nvidia_oc`
