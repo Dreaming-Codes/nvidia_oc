@@ -1,10 +1,8 @@
 name: Release Workflow
 
 permissions:
-  id-token: write
   contents: write
   actions: write
-  attestations: write
 
 on:
   push:
@@ -54,10 +52,6 @@ jobs:
     - name: Build the crate
       if: env.should_release == 'true'
       run: cargo build --release
-
-    - uses: actions/attest-build-provenance@v1
-      with:
-        subject-path: 'target/release/nvidia_oc'
 
     - name: Create a new tag
       if: env.should_release == 'true'
