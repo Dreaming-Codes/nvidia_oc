@@ -57,7 +57,7 @@ fn main() {
                     power_limit,
                 },
         } => {
-            sudo::escalate_if_needed().expect("Failed to escalate privileges");
+            sudo2::escalate_if_needed().expect("Failed to escalate privileges");
 
             let nvml = Nvml::init().expect("Failed to initialize NVML");
 
