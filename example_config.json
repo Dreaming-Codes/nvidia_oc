@@ -1,0 +1,9 @@
+{
+  "sets": {
+    "0": {
+      "freqOffset": 200000,
+      "memOffset": 160,
+      "powerLimit": 500
+    }
+  }
+}

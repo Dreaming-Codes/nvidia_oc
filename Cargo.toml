@@ -11,5 +11,7 @@ clap = { version = "4.5.9", features = ["derive"] }
 clap_complete = "4.5.8"
 nvml-wrapper = "0.10.0"
 nvml-wrapper-sys = "0.8.0"
+serde = { version = "1.0.210", features = ["derive"] }
+serde_json = "1.0.128"
 sudo2 = "0.2.1"
 which = "6.0.3"

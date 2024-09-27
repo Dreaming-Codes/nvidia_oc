@@ -2,13 +2,17 @@ use clap::{arg, Args, CommandFactory, Parser, Subcommand};
 use clap_complete::{generate, Generator, Shell};
 use nvml_wrapper::Nvml;
 use nvml_wrapper_sys::bindings::{nvmlDevice_t, NvmlLib};
-use std::io;
+use serde::Deserialize;
+use std::{collections::HashMap, io};
 
 #[derive(Parser, Debug)]
 #[command(version, about)]
 struct Cli {
     #[command(subcommand)]
-    command: Commands,
+    command: Option<Commands>,
+    /// Path to the config file
+    #[arg(short, long, default_value = "/etc/nvidia_oc.json")]
+    file: String,
 }
 
 #[derive(Subcommand, Debug)]
@@ -30,7 +34,8 @@ enum Commands {
     },
 }
 
-#[derive(Args, Debug)]
+#[derive(Args, Debug, Deserialize)]
+#[serde(rename_all = "camelCase")]
 #[group(required = true, multiple = true)]
 struct Sets {
     /// GPU frequency offset
@@ -44,19 +49,34 @@ struct Sets {
     power_limit: Option<u32>,
 }
 
+impl Sets {
+    fn apply(&self, nvml: &NvmlLib, device: nvmlDevice_t) {
+        if let Some(freq_offset) = self.freq_offset {
+            set_gpu_frequency_offset(&nvml, device, freq_offset)
+                .expect("Failed to set GPU frequency offset");
+        }
+
+        if let Some(mem_offset) = self.mem_offset {
+            set_gpu_memory_frequency_offset(&nvml, device, mem_offset)
+                .expect("Failed to set GPU memory frequency offset");
+        }
+
+        if let Some(limit) = self.power_limit {
+            set_gpu_power_limit(&nvml, device, limit).expect("Failed to set GPU power limit");
+        }
+    }
+}
+
+#[derive(Deserialize)]
+struct Config {
+    sets: HashMap<u32, Sets>,
+}
+
 fn main() {
     let cli = Cli::parse();
 
     match &cli.command {
-        Commands::Set {
-            index,
-            sets:
-                Sets {
-                    freq_offset,
-                    mem_offset,
-                    power_limit,
-                },
-        } => {
+        Some(Commands::Set { index, sets }) => {
             escalate_permissions().expect("Failed to escalate permissions");
 
             sudo2::escalate_if_needed()
@@ -73,24 +93,34 @@ fn main() {
                 let nvml_lib =
                     NvmlLib::new("libnvidia-ml.so").expect("Failed to load NVML library");
 
-                if let Some(offset) = freq_offset {
-                    set_gpu_frequency_offset(&nvml_lib, raw_device_handle, *offset)
-                        .expect("Failed to set GPU frequency offset");
-                }
+                sets.apply(&nvml_lib, raw_device_handle);
+            }
+            println!("Successfully set GPU parameters.");
+        }
+        None => {
+            let Ok(config_file) = std::fs::read_to_string(cli.file) else {
+                panic!("Configuration file not found and no valid arguments were provided. Run `nvidia_oc --help` for more information.");
+            };
 
-                if let Some(offset) = mem_offset {
-                    set_gpu_memory_frequency_offset(&nvml_lib, raw_device_handle, *offset)
-                        .expect("Failed to set GPU memory frequency offset");
-                }
+            escalate_permissions().expect("Failed to escalate permissions");
 
-                if let Some(limit) = power_limit {
-                    set_gpu_power_limit(&nvml_lib, raw_device_handle, *limit)
-                        .expect("Failed to set GPU power limit");
+            let config: Config =
+                serde_json::from_str(&config_file).expect("Invalid configuration file");
+
+            let nvml = Nvml::init().expect("Failed to initialize NVML");
+
+            unsafe {
+                let nvml_lib =
+                    NvmlLib::new("libnvidia-ml.so").expect("Failed to load NVML library");
+
+                for (index, sets) in config.sets {
+                    let device = nvml.device_by_index(index).expect("Failed to get GPU");
+                    sets.apply(&nvml_lib, device.handle());
                 }
             }
             println!("Successfully set GPU parameters.");
         }
-        Commands::Completion { shell } => {
+        Some(Commands::Completion { shell }) => {
             generate_completion_script(*shell);
         }
     }
