@@ -57,6 +57,8 @@ fn main() {
                     power_limit,
                 },
         } => {
+            escalate_permissions().expect("Failed to escalate permissions");
+
             sudo2::escalate_if_needed()
                 .or_else(|_| sudo2::doas())
                 .or_else(|_| sudo2::pkexec())
@@ -92,6 +94,24 @@ fn main() {
             generate_completion_script(*shell);
         }
     }
+}
+
+fn escalate_permissions() -> Result<(), Box<dyn std::error::Error>> {
+    if sudo2::running_as_root() {
+        return Ok(());
+    }
+
+    if which::which("sudo").is_ok() {
+        sudo2::escalate_if_needed()?;
+    } else if which::which("doas").is_ok() {
+        sudo2::doas()?;
+    } else if which::which("pkexec").is_ok() {
+        sudo2::pkexec()?;
+    } else {
+        return Err("Please install sudo, doas or pkexec and try again. Alternatively, run the program as root.".into());
+    }
+
+    Ok(())
 }
 
 fn set_gpu_frequency_offset(
