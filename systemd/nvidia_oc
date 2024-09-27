@@ -1,0 +1,10 @@
+# Uncomment and adjust the following values for the systemd service
+
+# Select the GPU by Index
+INDEX=0
+# Power Limit in milliwatts
+POWERLIMIT=200000
+# Frequency Offset compared to default frequency
+FREQ_OFFSET=160
+# Memory offset compared to default memory frequency
+MEM_OFFSET=500

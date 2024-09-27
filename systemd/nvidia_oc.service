@@ -1,0 +1,11 @@
+[Unit]
+Description=NVIDIA Overclocking Service
+After=network.target
+
+[Service]
+EnvironmentFile=/etc/nvidia_oc
+ExecStart=/usr/bin/nvidia_oc set --index ${INDEX} --power-limit ${POWERLIMIT} --freq-offset ${FREQ_OFFSET} --mem-offset ${MEM_OFFSET}
+Restart=on-failure
+
+[Install]
+WantedBy=multi-user.target
