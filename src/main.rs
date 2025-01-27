@@ -39,10 +39,10 @@ enum Commands {
 #[group(required = true, multiple = true)]
 struct Sets {
     /// GPU frequency offset
-    #[arg(short, long)]
+    #[arg(short, long, allow_hyphen_values = true)]
     freq_offset: Option<i32>,
     /// GPU memory frequency offset
-    #[arg(long = "mem-offset")]
+    #[arg(long = "mem-offset", allow_hyphen_values = true)]
     mem_offset: Option<i32>,
     /// GPU power limit in milliwatts
     #[arg(short, long)]
