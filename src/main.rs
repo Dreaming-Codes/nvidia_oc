@@ -26,6 +26,12 @@ enum Commands {
         #[command(flatten)]
         sets: Sets,
     },
+    /// Gets GPU parameters
+    Get {
+        /// GPU index
+        #[arg(short, long)]
+        index: u32,
+    },
     /// Generate shell completion script
     Completion {
         /// The shell to generate the script for
@@ -107,6 +113,33 @@ fn main() {
                 sets.apply(&nvml_lib, raw_device_handle);
             }
             println!("Successfully set GPU parameters.");
+        }
+        Some(Commands::Get { index }) => {
+            let nvml = Nvml::init().expect("Failed to initialize NVML");
+            let device = nvml.device_by_index(*index).expect("Failed to get GPU");
+
+            let mut freq_offset: i32 = 0;
+            let freq_offset_ptr: *mut i32 = &mut freq_offset;
+
+            let mut mem_offset: i32 = 0;
+            let mem_offset_ptr: *mut i32 = &mut mem_offset;
+
+            let mut power_limit: u32 = 0;
+            let power_limit_ptr: *mut u32 = &mut power_limit;
+
+            unsafe {
+                let raw_device_handle: nvmlDevice_t = device.handle();
+                let nvml_lib =
+                    NvmlLib::new("libnvidia-ml.so").expect("Failed to load NVML library");
+
+                nvml_lib.nvmlDeviceGetGpcClkVfOffset(raw_device_handle, freq_offset_ptr);
+                nvml_lib.nvmlDeviceGetMemClkVfOffset(raw_device_handle, mem_offset_ptr);
+                nvml_lib.nvmlDeviceGetPowerManagementLimit(raw_device_handle, power_limit_ptr);
+            }
+
+            println!("GPU frequency offset: {} Hz", freq_offset);
+            println!("GPU memory frequency offset: {} Hz", mem_offset);
+            println!("GPU power limit: {} mW", power_limit);
         }
         None => {
             let Ok(config_file) = std::fs::read_to_string(cli.file) else {
