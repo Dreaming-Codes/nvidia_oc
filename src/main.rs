@@ -1,7 +1,10 @@
 use clap::{arg, Args, CommandFactory, Parser, Subcommand};
 use clap_complete::{generate, Generator, Shell};
-use nvml_wrapper::Nvml;
-use nvml_wrapper_sys::bindings::{nvmlDevice_t, NvmlLib};
+use nvml_wrapper::{
+    error::{nvml_try, NvmlError},
+    Nvml,
+};
+use nvml_wrapper_sys::bindings::{nvmlDevice_t, nvmlReturn_t, NvmlLib};
 use serde::Deserialize;
 use std::{collections::HashMap, io};
 
@@ -118,28 +121,32 @@ fn main() {
             let nvml = Nvml::init().expect("Failed to initialize NVML");
             let device = nvml.device_by_index(*index).expect("Failed to get GPU");
 
-            let mut freq_offset: i32 = 0;
-            let freq_offset_ptr: *mut i32 = &mut freq_offset;
-
-            let mut mem_offset: i32 = 0;
-            let mem_offset_ptr: *mut i32 = &mut mem_offset;
-
-            let mut power_limit: u32 = 0;
-            let power_limit_ptr: *mut u32 = &mut power_limit;
-
             unsafe {
                 let raw_device_handle: nvmlDevice_t = device.handle();
                 let nvml_lib =
                     NvmlLib::new("libnvidia-ml.so").expect("Failed to load NVML library");
 
-                nvml_lib.nvmlDeviceGetGpcClkVfOffset(raw_device_handle, freq_offset_ptr);
-                nvml_lib.nvmlDeviceGetMemClkVfOffset(raw_device_handle, mem_offset_ptr);
-                nvml_lib.nvmlDeviceGetPowerManagementLimit(raw_device_handle, power_limit_ptr);
-            }
+                let freq_offset =
+                    get_value(|v| nvml_lib.nvmlDeviceGetGpcClkVfOffset(raw_device_handle, v));
+                match freq_offset {
+                    Ok(freq_offset) => println!("GPU frequency offset: {} Hz", freq_offset),
+                    Err(e) => eprintln!("Failed to get GPU frequency offset: {:?}", e),
+                }
 
-            println!("GPU frequency offset: {} Hz", freq_offset);
-            println!("GPU memory frequency offset: {} Hz", mem_offset);
-            println!("GPU power limit: {} mW", power_limit);
+                let mem_offset =
+                    get_value(|v| nvml_lib.nvmlDeviceGetMemClkVfOffset(raw_device_handle, v));
+                match mem_offset {
+                    Ok(mem_offset) => println!("GPU memory frequency offset: {} Hz", mem_offset),
+                    Err(e) => eprintln!("Failed to get GPU memory frequency offset: {:?}", e),
+                }
+
+                let power_limit =
+                    get_value(|v| nvml_lib.nvmlDeviceGetPowerManagementLimit(raw_device_handle, v));
+                match power_limit {
+                    Ok(power_limit) => println!("GPU power limit: {} mW", power_limit),
+                    Err(e) => eprintln!("Failed to get GPU power limit: {:?}", e),
+                }
+            }
         }
         None => {
             let Ok(config_file) = std::fs::read_to_string(cli.file) else {
@@ -186,6 +193,20 @@ fn escalate_permissions() -> Result<(), Box<dyn std::error::Error>> {
     }
 
     Ok(())
+}
+
+fn get_value<T, F>(f: F) -> Result<T, Option<NvmlError>>
+where
+    T: Default,
+    F: FnOnce(*mut T) -> nvmlReturn_t,
+{
+    let mut value = T::default();
+    let status = f(&mut value);
+    if status == 0 {
+        Ok(value)
+    } else {
+        Err(nvml_try(status).err())
+    }
 }
 
 fn set_gpu_frequency_offset(
