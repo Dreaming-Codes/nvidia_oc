@@ -155,7 +155,7 @@ fn main() {
                 let power_limit =
                     get_value(|v| nvml_lib.nvmlDeviceGetEnforcedPowerLimit(raw_device_handle, v));
                 match power_limit {
-                    Ok(power_limit) => println!("GPU power limit: {} mW", power_limit),
+                    Ok(power_limit) => println!("GPU power limit: {} W", power_limit / 1000),
                     Err(e) => eprintln!("Failed to get GPU power limit: {:?}", e),
                 }
             }
